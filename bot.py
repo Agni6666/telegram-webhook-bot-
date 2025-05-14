@@ -1,8 +1,10 @@
 import os
 import json
 import logging
+import asyncio
+from threading import Thread
 from flask import Flask, request
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -10,8 +12,6 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 # Environment variables
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -22,7 +22,7 @@ CHANNEL_ID = "@agnisinghmodel"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load media map
+# Load media map from JSON
 def load_media_map():
     try:
         with open("media_map.json", "r") as f:
@@ -31,10 +31,11 @@ def load_media_map():
         logger.error(f"Error loading media_map.json: {e}")
         return {}
 
-# Command handlers
+# Command: /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Welcome! Send a keyword to get the media.")
 
+# Handle keyword messages
 async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt = update.message.text.strip()
     media_map = load_media_map()
@@ -53,9 +54,9 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("No media found for that keyword.")
 
-# Create Flask app
+# Flask app setup
 app = Flask(__name__)
-application = None  # Placeholder for the bot app
+application = None  # Telegram bot application
 
 @app.route('/')
 def home():
@@ -63,19 +64,41 @@ def home():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    if application:
-        update = Update.de_json(request.get_json(force=True), application.bot)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(application.process_update(update))
-    return 'OK'
+    try:
+        incoming_data = request.get_json(force=True)
+        logger.info(f"Received data: {incoming_data}")
 
-# Main bot setup
+        if application:
+            update = Update.de_json(incoming_data, application.bot)
+            Thread(target=asyncio.run, args=(application.process_update(update),)).start()
+
+        return 'OK'
+    except Exception as e:
+        logger.error(f"Error in webhook: {e}")
+        return 'Error', 500
+
+# Set webhook with logging
 async def set_webhook():
-    await application.bot.delete_webhook()
-    await application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-    logger.info("Webhook set successfully.")
+    if not WEBHOOK_URL:
+        logger.error("WEBHOOK_URL environment variable is not set!")
+        return
 
+    url = f"{WEBHOOK_URL}/webhook"
+    try:
+        logger.info("Deleting old webhook (if any)...")
+        await application.bot.delete_webhook()
+
+        logger.info(f"Setting new webhook to: {url}")
+        success = await application.bot.set_webhook(url)
+
+        if success:
+            logger.info("Webhook set successfully.")
+        else:
+            logger.error("Failed to set webhook. Telegram API returned False.")
+    except Exception as e:
+        logger.error(f"Error setting webhook: {e}")
+
+# Bot initialization
 def main():
     global application
     application = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -83,7 +106,6 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
 
-    # Set webhook asynchronously
     asyncio.run(set_webhook())
 
 if __name__ == '__main__':
