@@ -7,8 +7,8 @@ from telegram.ext import (
     MessageHandler, ContextTypes, filters
 )
 
-BOT_TOKEN = os.environ.get("7790531310:AAFkK83FK_vqleBZnfGel_JWbKbfqXfKK4w")
-WEBHOOK_URL = os.environ.get("https://agni-model.onrender.com")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 CHANNEL_ID = "@agnisinghmodel"
 
 bot = Bot(BOT_TOKEN)
