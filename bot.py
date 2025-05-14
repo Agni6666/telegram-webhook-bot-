@@ -54,7 +54,10 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
     application.post_init = set_webhook
     logger.info("Bot is running...")
-    application.run_polling()
+    
+    # Ensure webhook is used
+    application.run_webhook(listen="0.0.0.0", port=int(os.environ.get("PORT", 8080)), url_path='webhook')
+    logger.info("Webhook is listening...")
 
 if __name__ == "__main__":
     main()
