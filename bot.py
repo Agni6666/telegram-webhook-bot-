@@ -11,6 +11,7 @@ from telegram.ext import (
     filters,
 )
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # Environment variables
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -64,13 +65,15 @@ def home():
 def webhook():
     if application:
         update = Update.de_json(request.get_json(force=True), application.bot)
-        asyncio.run(application.process_update(update))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.process_update(update))
     return 'OK'
 
 # Main bot setup
-async def set_webhook(app):
-    await app.bot.delete_webhook()
-    await app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+async def set_webhook():
+    await application.bot.delete_webhook()
+    await application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logger.info("Webhook set successfully.")
 
 def main():
@@ -81,7 +84,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
 
     # Set webhook asynchronously
-    asyncio.run(set_webhook(application))
+    asyncio.run(set_webhook())
 
 if __name__ == '__main__':
     main()
