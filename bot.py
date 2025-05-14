@@ -49,14 +49,19 @@ async def set_webhook(application):
         logger.error(f"Error setting webhook: {e}")
 
 def main():
+    print("Webhook URL:", WEBHOOK_URL)  # Debug line to print the webhook URL
+
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
     application.post_init = set_webhook
     logger.info("Bot is running...")
-    
-    # Run using webhooks only
-    application.run_webhook(listen="0.0.0.0", port=int(os.environ.get("PORT", 8080)), url_path='webhook')
+
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        url_path='webhook'
+    )
     logger.info("Webhook is listening...")
 
 if __name__ == "__main__":
