@@ -40,7 +40,7 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("No media found for that keyword.")
 
-async def set_webhook():
+async def set_webhook(application):
     bot = Bot(BOT_TOKEN)
     try:
         await bot.delete_webhook()
@@ -53,7 +53,7 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
-    application.job_queue.run_once(lambda _: set_webhook(), 0)
+    application.post_init(set_webhook)
     logger.info("Bot is running...")
     application.run_polling()
 
