@@ -1,25 +1,22 @@
 import os
+import logging
 import json
-from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import (
-    Application, ApplicationBuilder, CommandHandler,
-    MessageHandler, ContextTypes, filters
-)
+from telegram import Bot, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 CHANNEL_ID = "@agnisinghmodel"
 
-bot = Bot(BOT_TOKEN)
-app = Flask(__name__)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def load_media_map():
     try:
         with open("media_map.json", "r") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Error loading media_map.json: {e}")
+        logger.error(f"Error loading media_map.json: {e}")
         return {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -38,26 +35,27 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=message_id
             )
         except Exception as e:
-            print(f"Error forwarding message: {e}")
+            logger.error(f"Error forwarding message: {e}")
             await update.message.reply_text("Error sending the media.")
     else:
         await update.message.reply_text("No media found for that keyword.")
 
-application = ApplicationBuilder().token(BOT_TOKEN).build()
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
+async def set_webhook():
+    bot = Bot(BOT_TOKEN)
+    try:
+        await bot.delete_webhook()
+        await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+        logger.info("Webhook set successfully!")
+    except Exception as e:
+        logger.error(f"Error setting webhook: {e}")
 
-@app.route('/')
-def home():
-    return "Bot is online!"
+def main():
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
+    application.job_queue.run_once(lambda _: set_webhook(), 0)
+    logger.info("Bot is running...")
+    application.run_polling()
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    application.update_queue.put_nowait(update)
-    return "OK"
-
-if __name__ == '__main__':
-    bot.delete_webhook()
-    bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+if __name__ == "__main__":
+    main()
