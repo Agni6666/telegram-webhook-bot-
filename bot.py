@@ -41,10 +41,9 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No media found for that keyword.")
 
 async def set_webhook(application):
-    bot = Bot(BOT_TOKEN)
     try:
-        await bot.delete_webhook()
-        await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+        await application.bot.delete_webhook()
+        await application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
         logger.info("Webhook set successfully!")
     except Exception as e:
         logger.error(f"Error setting webhook: {e}")
@@ -53,7 +52,7 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
-    application.post_init(set_webhook)
+    application.post_init = set_webhook
     logger.info("Bot is running...")
     application.run_polling()
 
