@@ -1,74 +1,47 @@
 import os
 import logging
-import json
-from telegram import Bot, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import telegram
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
-CHANNEL_ID = "@agnisinghmodel"
+# Logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Environment and constants
+TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://agni-model.onrender.com/webhook")
 
-def load_media_map():
-    try:
-        with open("media_map.json", "r") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading media_map.json: {e}")
-        return {}
+if not WEBHOOK_URL.startswith("https://"):
+    raise ValueError("WEBHOOK_URL must start with 'https://'")
 
+# Define a basic command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome! Send a keyword to get the media.")
+    await update.message.reply_text("Hello! Your bot is up and running.")
 
-async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    prompt = update.message.text.strip()
-    media_map = load_media_map()
+# Set up the bot application
+async def main():
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    if prompt in media_map:
-        message_id = media_map[prompt]
-        try:
-            await context.bot.forward_message(
-                chat_id=update.effective_chat.id,
-                from_chat_id=CHANNEL_ID,
-                message_id=message_id
-            )
-        except Exception as e:
-            logger.error(f"Error forwarding message: {e}")
-            await update.message.reply_text("Error sending the media.")
-    else:
-        await update.message.reply_text("No media found for that keyword.")
-
-async def set_webhook(application):
-    try:
-        if not WEBHOOK_URL:
-            logger.error("WEBHOOK_URL is not set. Cannot set webhook.")
-            return
-
-        full_url = f"{WEBHOOK_URL}/webhook"
-        logger.info(f"Setting webhook to: {full_url}")
-        await application.bot.delete_webhook()
-        await application.bot.set_webhook(full_url)
-        logger.info("Webhook set successfully!")
-    except Exception as e:
-        logger.error(f"Error setting webhook: {e}")
-
-def main():
-    print("Webhook URL:", WEBHOOK_URL)  # Debug print
-
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Register handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_prompt))
-    application.post_init = set_webhook
-    logger.info("Bot is running...")
 
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8080)),
-        url_path='webhook'
-    )
-    logger.info("Webhook is listening...")
+    # Check existing webhook
+    bot: Bot = application.bot
+    try:
+        current_webhook = await bot.get_webhook_info()
+        if current_webhook.url != WEBHOOK_URL:
+            logging.info(f"Setting webhook to {WEBHOOK_URL}")
+            await bot.set_webhook(url=WEBHOOK_URL)
+        else:
+            logging.info(f"Webhook already set to {WEBHOOK_URL}")
+    except telegram.error.TelegramError as e:
+        logging.error(f"Failed to set webhook: {e}")
 
-if __name__ == "__main__":
-    main()
+    logging.info("Bot is ready.")
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
