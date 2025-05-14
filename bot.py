@@ -42,14 +42,20 @@ async def handle_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def set_webhook(application):
     try:
+        if not WEBHOOK_URL:
+            logger.error("WEBHOOK_URL is not set. Cannot set webhook.")
+            return
+
+        full_url = f"{WEBHOOK_URL}/webhook"
+        logger.info(f"Setting webhook to: {full_url}")
         await application.bot.delete_webhook()
-        await application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+        await application.bot.set_webhook(full_url)
         logger.info("Webhook set successfully!")
     except Exception as e:
         logger.error(f"Error setting webhook: {e}")
 
 def main():
-    print("Webhook URL:", WEBHOOK_URL)  # Debug line to print the webhook URL
+    print("Webhook URL:", WEBHOOK_URL)  # Debug print
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
