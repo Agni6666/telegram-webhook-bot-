@@ -55,7 +55,7 @@ def main():
     application.post_init = set_webhook
     logger.info("Bot is running...")
     
-    # Ensure webhook is used
+    # Run using webhooks only
     application.run_webhook(listen="0.0.0.0", port=int(os.environ.get("PORT", 8080)), url_path='webhook')
     logger.info("Webhook is listening...")
 
